@@ -5,21 +5,48 @@
 
 const STORAGE_KEY = "fundledger.v1";
 
-/** @type {{transactions: Array, navByFund: Object}} */
+/** @type {{transactions: Array, navByFund: Object, schemeCodeByFund: Object}} */
 let state = loadState();
+
+/** Parsed nav.json (fetched fresh each load, never stored) */
+let amfiNav = null;
 
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (!parsed.schemeCodeByFund) parsed.schemeCodeByFund = {};
+      return parsed;
+    }
   } catch (e) {
     console.error("Could not read saved data:", e);
   }
-  return { transactions: [], navByFund: {} };
+  return { transactions: [], navByFund: {}, schemeCodeByFund: {} };
 }
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+/* ---------------------------------------------------------
+   Auto NAV feed — nav.json is written by a scheduled GitHub
+   Action (see .github/workflows/update-nav.yml) that pulls
+   AMFI's daily NAV file server-side, sidestepping the browser
+   CORS block that stops this app fetching amfiindia.com
+   directly. This fetch is best-effort: if nav.json isn't
+   there yet (Action not set up, or running from a local file),
+   the app just falls back to manual NAV entry.
+--------------------------------------------------------- */
+async function loadAmfiNav() {
+  try {
+    const res = await fetch("nav.json?t=" + Date.now());
+    if (!res.ok) return;
+    amfiNav = await res.json();
+    render();
+  } catch (e) {
+    // No nav.json yet (Action not set up, or opened as a local file) — that's fine.
+  }
 }
 
 /* ---------------------------------------------------------
@@ -84,6 +111,14 @@ function fundNames() {
   return Array.from(names).sort();
 }
 
+function autoNavFor(fund) {
+  if (!amfiNav) return null;
+  const code = state.schemeCodeByFund[fund];
+  if (!code) return null;
+  const entry = amfiNav[String(code).trim()];
+  return entry ? { value: entry.nav, date: entry.date, name: entry.name } : null;
+}
+
 function statsForFund(fund) {
   const txns = state.transactions.filter(t => t.fund === fund);
   let units = 0, invested = 0;
@@ -100,7 +135,13 @@ function statsForFund(fund) {
       cashflows.push({ amount: t.amount, date: new Date(t.date) });
     }
   }
-  const latestNav = state.navByFund[fund] ?? null;
+
+  const manualNav = state.navByFund[fund];
+  const auto = autoNavFor(fund);
+  const latestNav = manualNav != null ? manualNav : (auto ? auto.value : null);
+  const navSource = manualNav != null ? "manual" : (auto ? "auto" : null);
+  const navDate = navSource === "auto" ? auto.date : null;
+
   const currentValue = latestNav != null ? units * latestNav : null;
   const gain = currentValue != null ? currentValue - invested : null;
   const returnPct = currentValue != null && invested !== 0 ? gain / invested : null;
@@ -110,7 +151,11 @@ function statsForFund(fund) {
     const cfs = cashflows.concat([{ amount: currentValue, date: new Date() }]);
     cagr = computeXirr(cfs);
   }
-  return { fund, units, invested, latestNav, currentValue, gain, returnPct, cagr };
+  return {
+    fund, units, invested, latestNav, currentValue, gain, returnPct, cagr,
+    schemeCode: state.schemeCodeByFund[fund] || "",
+    navSource, navDate, autoAvailable: auto != null,
+  };
 }
 
 function portfolioStats() {
@@ -206,10 +251,23 @@ function renderHoldings() {
 
   for (const f of p.funds) {
     const tr = document.createElement("tr");
+    let navMeta = "";
+    if (f.navSource === "auto") {
+      navMeta = `<div class="nav-meta auto">Auto · ${escapeHtml(f.navDate || "")}</div>`;
+    } else if (f.navSource === "manual" && f.autoAvailable) {
+      navMeta = `<div class="nav-meta manual">Manual <button class="nav-reset" data-fund="${escapeHtml(f.fund)}" type="button">Use auto</button></div>`;
+    } else if (f.schemeCode && !f.autoAvailable) {
+      navMeta = `<div class="nav-meta missing">Not found yet</div>`;
+    }
     tr.innerHTML = `
       <td class="fund-cell">${escapeHtml(f.fund)}</td>
-      <td class="num"><input class="nav-input" type="number" step="0.0001" min="0"
-            data-fund="${escapeHtml(f.fund)}" value="${f.latestNav ?? ""}" placeholder="—"></td>
+      <td class="num"><input class="scheme-input" type="text" inputmode="numeric"
+            data-fund="${escapeHtml(f.fund)}" value="${escapeHtml(f.schemeCode)}" placeholder="Scheme code"></td>
+      <td class="num">
+        <input class="nav-input" type="number" step="0.0001" min="0"
+              data-fund="${escapeHtml(f.fund)}" value="${f.latestNav ?? ""}" placeholder="—">
+        ${navMeta}
+      </td>
       <td class="num">${f.units.toFixed(3)}</td>
       <td class="num">${inr(f.invested)}</td>
       <td class="num">${inr(f.currentValue)}</td>
@@ -219,6 +277,16 @@ function renderHoldings() {
     `;
     body.appendChild(tr);
   }
+
+  document.querySelectorAll(".scheme-input").forEach(input => {
+    input.addEventListener("change", (e) => {
+      const fund = e.target.dataset.fund;
+      const val = e.target.value.trim();
+      if (val) state.schemeCodeByFund[fund] = val;
+      else delete state.schemeCodeByFund[fund];
+      render();
+    });
+  });
 
   document.querySelectorAll(".nav-input").forEach(input => {
     input.addEventListener("change", (e) => {
@@ -233,10 +301,18 @@ function renderHoldings() {
     });
   });
 
+  document.querySelectorAll(".nav-reset").forEach(btn => {
+    btn.addEventListener("click", () => {
+      delete state.navByFund[btn.dataset.fund];
+      render();
+    });
+  });
+
   if (p.funds.length) {
     foot.innerHTML = `
       <tr>
         <td>Portfolio total</td>
+        <td></td>
         <td></td>
         <td></td>
         <td class="num">${inr(p.invested)}</td>
@@ -368,7 +444,11 @@ document.getElementById("importInput").addEventListener("change", (e) => {
       const parsed = JSON.parse(reader.result);
       if (!Array.isArray(parsed.transactions)) throw new Error("Not a valid backup file");
       if (!confirm("This will replace everything currently in the app with the backup file. Continue?")) return;
-      state = { transactions: parsed.transactions, navByFund: parsed.navByFund || {} };
+      state = {
+        transactions: parsed.transactions,
+        navByFund: parsed.navByFund || {},
+        schemeCodeByFund: parsed.schemeCodeByFund || {},
+      };
       render();
     } catch (err) {
       alert("Couldn't read that file — is it a Fund Ledger backup .json?");
@@ -382,3 +462,4 @@ document.getElementById("importInput").addEventListener("change", (e) => {
    Boot
 --------------------------------------------------------- */
 render();
+loadAmfiNav();

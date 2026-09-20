@@ -204,8 +204,38 @@ tfoot td {
   font-variant-numeric: tabular-nums;
 }
 
+.scheme-input {
+  width: 76px;
+  padding: 5px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  text-align: right;
+}
+
+.nav-meta {
+  font-size: 10.5px;
+  margin-top: 3px;
+  white-space: nowrap;
+}
+.nav-meta.auto { color: var(--gain); }
+.nav-meta.manual { color: var(--ink-soft); }
+.nav-meta.missing { color: var(--loss); }
+.nav-reset {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 4px;
+}
+
 .holdings-table {
-  min-width: 680px;
+  min-width: 780px;
 }
 .fab {
   position: fixed;

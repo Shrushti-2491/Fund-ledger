@@ -11,12 +11,52 @@ No account, no sign-up, no server. Everything runs entirely in your browser.
 
 - **Ledger tab** — log transactions: date, fund name, Buy/Sell, amount, NAV.
   Units are calculated for you.
-- **Holdings tab** — one row per fund. Type in the fund's latest NAV whenever
-  you check it, and units held, amount invested, current value, gain, and
-  CAGR (XIRR) all update automatically. A Portfolio Total row blends
-  everything into one number.
+- **Holdings tab** — one row per fund. Either add the fund's **AMFI Scheme
+  Code** once and its NAV updates automatically every day, or just type the
+  NAV in yourself whenever you check it — either way, units held, amount
+  invested, current value, gain, and CAGR (XIRR) all update automatically.
+  A Portfolio Total row blends everything into one number.
 - **Backup** — since your data lives only in this browser (see below), an
   Export/Import button lets you save and restore a `.json` backup file.
+
+## Automatic NAV updates (optional, one-time setup)
+
+Every mutual fund's NAV is published once a day by AMFI in one shared file
+covering every scheme in the country. A browser can't safely fetch that
+file directly (a security rule called CORS blocks it), so this app uses a
+small **GitHub Action** — a script that runs automatically on GitHub's own
+servers once a day, downloads the file there instead of in your browser,
+and saves a compact `nav.json` into your repo that the app reads instantly.
+This is entirely free and needs no server of your own.
+
+**To turn it on** (skip this if you're happy typing NAVs in by hand):
+
+1. Once you've uploaded all the files (including the `scripts` and
+   `.github` folders — GitHub's drag-and-drop upload preserves folder
+   structure) and turned on GitHub Pages, go to your repository's
+   **Settings → Actions → General**.
+2. Scroll to "Workflow permissions" and select **"Read and write
+   permissions"**, then Save. This lets the Action save the NAV file back
+   into your repo.
+3. Go to the **Actions** tab at the top of your repository. You should see
+   a workflow called "Update mutual fund NAVs". Click it, then click **"Run
+   workflow"** (top right) to fetch NAVs immediately instead of waiting for
+   the daily schedule.
+4. After it finishes (usually under a minute), check that a `nav.json`
+   file with real data now exists in your repo.
+5. On the **Holdings** tab of the app, find each fund's **Scheme Code** —
+   search "`<fund name> scheme code AMFI`" online, or check a CAMS/KFintech
+   statement — and type it into the Scheme Code box. Make sure you use the
+   code for the correct Plan (Direct/Regular) and Option (Growth/IDCW) to
+   match what you actually hold. The NAV fills in on its own within
+   seconds.
+
+From then on, the Action runs automatically on weekday evenings (Indian
+time) and keeps `nav.json` current — you never need to trigger it manually
+again. If you ever prefer a specific fund's NAV over the automatic one
+(say AMFI briefly shows a stale figure), just type a number into that
+fund's NAV box — a "Manual" tag appears with a **Use auto** link to switch
+back whenever you like.
 
 ## ⚠️ Important: where your data lives
 
@@ -48,8 +88,12 @@ You don't need to know how to code for this part — just follow along.
 
 3. **Upload the files**: on your new repository's page, click
    "uploading an existing file" (or the "Add file" → "Upload files" button).
-   Drag in all four files from this folder — `index.html`, `style.css`,
-   `app.js`, and this `README.md` — then click "Commit changes".
+   Drag in **everything** from the fund-ledger folder — `index.html`,
+   `style.css`, `app.js`, `nav.json`, `README.md`, and the `scripts` and
+   `.github` folders — then click "Commit changes". Dragging a folder in
+   Chrome/Edge keeps its structure intact; if your browser flattens it
+   instead, use "Add file" → "Create new file" and type the folder name as
+   part of the file path (e.g. `scripts/fetch_nav.py`) to recreate it.
 
 4. **Turn on GitHub Pages** (this is what makes it a live website):
    - Go to your repository's **Settings** tab.
@@ -72,10 +116,9 @@ directly on GitHub: open the file, click the pencil (✎) icon, make your
 change, and commit it. GitHub Pages will redeploy automatically within a
 minute or two.
 
-## A note on NAV
+## A note on Scheme Codes
 
-This app doesn't fetch NAV automatically — you type it into the Holdings tab
-whenever you check it. Auto-fetching from AMFI's daily NAV file needs either
-a backend server or Excel-specific tools (like Power Query), neither of
-which fit a plain, free, static GitHub Pages site. If you'd like, this can
-be added later as a small serverless function — just ask.
+Each fund has a different scheme code for every combination of Plan
+(Direct/Regular) and Option (Growth/IDCW) — using the wrong one will pull
+in the wrong NAV. If a fund's auto NAV looks off, double-check the code
+against your account statement rather than guessing from a search result.
