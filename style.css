@@ -403,3 +403,12 @@ tfoot td {
   .summary-strip { grid-template-columns: 1fr 1fr; }
   .field-row { grid-template-columns: 1fr; }
 }
+
+/* Family tracker additions */
+[hidden] { display: none !important; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 16px 0; }
+.filters select, .sheet select { font: inherit; font-size: 14px; padding: 8px 10px; border: 1px solid #dcd8c8; border-radius: 10px; background: #fff; color: inherit; }
+.sheet select { width: 100%; }
+.sub { font-size: 12px; color: #6b7280; font-weight: 400; margin-top: 2px; }
+.group-title { font-family: "Spectral", serif; font-size: 18px; margin: 20px 16px 8px; }
+.link-btn { background: none; border: 0; color: #0f5c4d; font-size: 12px; cursor: pointer; text-decoration: underline; padding: 0 0 0 6px; }

@@ -17,7 +17,7 @@
     <span class="wordmark-icon">📒</span>
     <div>
       <h1>Fund Ledger</h1>
-      <p>Track SIPs, redemptions, and returns — right on your phone</p>
+      <p>Track your whole family's investments — right on your phone</p>
     </div>
   </div>
 </header>
@@ -41,21 +41,32 @@
   </div>
 </section>
 
+<div class="filters">
+  <select id="fltOwner" aria-label="Person"></select>
+  <select id="fltAsset" aria-label="Asset type"><option value="">All assets</option><option value="mf">Mutual funds</option><option value="stock">Stocks</option><option value="fd">FDs</option></select>
+  <select id="fltMode" aria-label="SIP or lump sum"><option value="">SIP + lump sum</option><option value="sip">SIP only</option><option value="lumpsum">Lump sum only</option></select>
+  <select id="fltPlan" aria-label="Plan"><option value="">Direct + Regular</option><option value="direct">Direct only</option><option value="regular">Regular only</option></select>
+</div>
+
 <nav class="tabs" role="tablist">
-  <button class="tab active" data-tab="ledger" role="tab" aria-selected="true">Ledger</button>
+  <button class="tab active" data-tab="family" role="tab" aria-selected="true">Family</button>
+  <button class="tab" data-tab="ledger" role="tab" aria-selected="false">Ledger</button>
   <button class="tab" data-tab="holdings" role="tab" aria-selected="false">Holdings</button>
 </nav>
 
 <main>
 
   <!-- LEDGER VIEW -->
-  <section id="view-ledger" class="view active">
+  <section id="view-family" class="view active"><div id="familyOut"></div></section>
+
+  <section id="view-ledger" class="view">
     <div class="table-wrap">
       <table class="ledger-table">
         <thead>
           <tr>
             <th>Date</th>
-            <th>Fund</th>
+            <th>Person</th>
+            <th>Name</th>
             <th>Type</th>
             <th class="num">Amount</th>
             <th class="num">NAV</th>
@@ -75,7 +86,8 @@
       <table class="holdings-table">
         <thead>
           <tr>
-            <th>Fund</th>
+            <th>Person</th>
+            <th>Name</th>
             <th class="num">Scheme code</th>
             <th class="num">Latest NAV</th>
             <th class="num">Units</th>
@@ -91,7 +103,11 @@
       </table>
       <p class="empty-state" id="holdingsEmpty">Add a transaction on the Ledger tab, and your funds will show up here automatically.</p>
     </div>
-    <p class="hint">Add a fund's AMFI Scheme Code once, and its NAV updates on its own daily. No code? Just type the NAV in yourself — everything else still works the same.</p>
+    <div id="fdSection" hidden>
+      <h3 class="group-title">Fixed deposits</h3>
+      <div class="table-wrap"><table class="holdings-table"><thead><tr><th>Person</th><th>FD</th><th class="num">Principal</th><th class="num">Rate</th><th class="num">Matures</th><th class="num">Value today</th><th class="num">Gain</th><th class="num">CAGR</th></tr></thead><tbody id="fdBody"></tbody></table></div>
+    </div>
+    <p class="hint">Add a fund's AMFI Scheme Code once, and its NAV updates on its own daily. No code? Just type the NAV in yourself — everything else still works the same. Stocks always use a price you type in. FD values are estimated from the rate you enter.</p>
   </section>
 
 </main>
@@ -103,9 +119,21 @@
 <div class="sheet" id="entrySheet" role="dialog" aria-modal="true" aria-label="Add transaction">
   <div class="sheet-handle"></div>
   <h2 id="sheetTitle">Add entry</h2>
-  <form id="entryForm">
+  <form id="entryForm" novalidate>
     <input type="hidden" id="entryId">
 
+    <label for="fOwner">Whose investment?</label>
+    <input type="text" id="fOwner" list="ownerNames" placeholder="e.g. Dad, Mom, Me" autocomplete="off">
+    <datalist id="ownerNames"></datalist>
+
+    <label>Asset</label>
+    <div class="segmented" id="fAsset">
+      <button type="button" class="seg-btn active" data-value="mf">Mutual fund</button>
+      <button type="button" class="seg-btn" data-value="stock">Stock</button>
+      <button type="button" class="seg-btn" data-value="fd">FD</button>
+    </div>
+
+    <div id="mktFields">
     <label for="fDate">Date</label>
     <input type="date" id="fDate" required>
 
@@ -128,6 +156,35 @@
         <label for="fNav">NAV per unit (₹)</label>
         <input type="number" id="fNav" min="0" step="0.0001" required>
       </div>
+    </div>
+
+    <label>How invested</label>
+    <div class="segmented" id="fMode">
+      <button type="button" class="seg-btn active" data-value="sip">SIP</button>
+      <button type="button" class="seg-btn" data-value="lumpsum">Lump sum</button>
+    </div>
+    <div id="planWrap">
+      <label>Plan</label>
+      <div class="segmented" id="fPlan">
+        <button type="button" class="seg-btn active" data-value="direct">Direct</button>
+        <button type="button" class="seg-btn" data-value="regular">Regular</button>
+      </div>
+    </div>
+    </div>
+
+    <div id="fdFields" hidden>
+      <label for="fdName">Bank / FD name</label>
+      <input type="text" id="fdName" placeholder="e.g. SBI 1-year FD">
+      <div class="field-row">
+        <div><label for="fdPrincipal">Amount (₹)</label><input type="number" id="fdPrincipal" min="0" step="0.01"></div>
+        <div><label for="fdRate">Interest rate (% p.a.)</label><input type="number" id="fdRate" min="0" step="0.01"></div>
+      </div>
+      <div class="field-row">
+        <div><label for="fdStart">Start date</label><input type="date" id="fdStart"></div>
+        <div><label for="fdMaturity">Maturity date</label><input type="date" id="fdMaturity"></div>
+      </div>
+      <label for="fdComp">Interest</label>
+      <select id="fdComp"><option value="quarterly">Compounded quarterly</option><option value="monthly">Compounded monthly</option><option value="yearly">Compounded yearly</option><option value="simple">Simple (paid out)</option></select>
     </div>
 
     <div class="sheet-actions">
