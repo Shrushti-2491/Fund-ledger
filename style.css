@@ -25,7 +25,7 @@ html, body {
 }
 
 body {
-  max-width: 1200px;
+  max-width: 600px;
   margin: 0 auto;
   padding-bottom: 96px;
   min-height: 100vh;
